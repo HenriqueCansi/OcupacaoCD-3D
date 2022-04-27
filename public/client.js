@@ -311,49 +311,53 @@ class FirstPersonCameraDemo {
 
         this.scene_ = new THREE.Scene();
 
+        const TextureBox = new THREE.TextureLoader().load(
+            './textures/box.jpg'
+        );
+        
         var geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
-var vermelho = new THREE.MeshMatcapMaterial({ color: 0xff0000 });
-var amarelo = new THREE.MeshMatcapMaterial({ color: 0xffff00 });
-var verde = new THREE.MeshMatcapMaterial({ color: 0x00ff00 });
+        var vermelho = new THREE.MeshMatcapMaterial({ color: 0xff0000, normalMap: TextureBox });
+        var amarelo = new THREE.MeshMatcapMaterial({ color: 0xffff00, normalMap: TextureBox  });
+        var verde = new THREE.MeshMatcapMaterial({ color: 0x00ff00, normalMap: TextureBox  });
 
-const layout = layoutText;
-console.log('layout:',layout);
-console.log('layout.lenfsath:',layout.length);
+        const layout = layoutText;
+        console.log('layout:', layout);
+        console.log('layout.lenfsath:', layout.length);
 
-let posZ = 0;
+        let posZ = 0;
 
-for (let rua = 0; rua < layout.length; rua = rua + 1) {
-    console.log('rua', rua);
-    let ultLado = 0;
+        for (let rua = 0; rua < layout.length; rua = rua + 1) {
+            console.log('rua', rua);
+            let ultLado = 0;
 
-    var dadorua = layout[rua];
-    //console.log(dadorua);
+            var dadorua = layout[rua];
+            //console.log(dadorua);
 
-    let andar = dadorua['rua'].max_andares;
+            let andar = dadorua['rua'].max_andares;
 
-    var enderecos = dadorua['rua'].enderecos; //.filter(({lado}) => lado === 1);
-    //console.log(enderecos);
+            var enderecos = dadorua['rua'].enderecos; //.filter(({lado}) => lado === 1);
+            //console.log(enderecos);
 
-    for (let end = 0; end < enderecos.length; end = end + 1) {
-        //console.log(enderecos[end]);
-        if (ultLado != enderecos[end].lado) {
-            ultLado = enderecos[end].lado;
-            posZ += 2;
+            for (let end = 0; end < enderecos.length; end = end + 1) {
+                //console.log(enderecos[end]);
+                if (ultLado != enderecos[end].lado) {
+                    ultLado = enderecos[end].lado;
+                    posZ += 2;
+                }
+
+                var cor = amarelo;
+                if (enderecos[end].cor === 'blq') cor = vermelho;
+                if (enderecos[end].cor === 'liv') cor = verde;
+
+                var cube = new THREE.Mesh(geometry, cor);
+
+                cube.position.x = enderecos[end].posX * 0.6;
+                cube.position.y = (enderecos[end].posY + andar) * 0.6;
+                cube.position.z = posZ;
+                this.scene_.add(cube);
+            }
+            posZ -= 1;
         }
-
-        var cor = amarelo;
-        if (enderecos[end].cor === 'blq') cor = vermelho;
-        if (enderecos[end].cor === 'liv') cor = verde;
-
-        var cube = new THREE.Mesh(geometry, cor);
-
-        cube.position.x = enderecos[end].posX * 0.6;
-        cube.position.y = (enderecos[end].posY + andar) * 0.6;
-        cube.position.z = posZ;
-        this.scene_.add(cube);
-    }
-    posZ -= 1;
-}
 
         this.uiCamera_ = new THREE.OrthographicCamera(
             -1,
@@ -457,7 +461,7 @@ for (let rua = 0; rua < layout.length; rua = rua + 1) {
         }
 
         // Crosshair
-        const crosshair = mapLoader.load('./textures/crosshair.png');
+        const crosshair = mapLoader.load('./textures/teste.png');
         crosshair.anisotropy = maxAnisotropy;
 
         this.sprite_ = new THREE.Sprite(
@@ -546,52 +550,6 @@ for (let rua = 0; rua < layout.length; rua = rua + 1) {
     }
 }
 let _APP = null;
-
-scene_ = new THREE.Scene();
-
-var geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
-var vermelho = new THREE.MeshMatcapMaterial({ color: 0xff0000 });
-var amarelo = new THREE.MeshMatcapMaterial({ color: 0xffff00 });
-var verde = new THREE.MeshMatcapMaterial({ color: 0x00ff00 });
-
-const layout = layoutText;
-console.log('layout:',layout);
-console.log('layout.lenfsath:',layout.length);
-
-let posZ = 0;
-
-for (let rua = 0; rua < layout.length; rua = rua + 1) {
-    console.log('rua', rua);
-    let ultLado = 0;
-
-    var dadorua = layout[rua];
-    //console.log(dadorua);
-
-    let andar = dadorua['rua'].max_andares;
-
-    var enderecos = dadorua['rua'].enderecos; //.filter(({lado}) => lado === 1);
-    //console.log(enderecos);
-
-    for (let end = 0; end < enderecos.length; end = end + 1) {
-        //console.log(enderecos[end]);
-        if (ultLado != enderecos[end].lado) {
-            ultLado = enderecos[end].lado;
-            posZ += 2;
-        }
-
-        var cor = amarelo;
-        if (enderecos[end].cor === 'blq') cor = vermelho;
-        if (enderecos[end].cor === 'liv') cor = verde;
-
-        var cube = new THREE.Mesh(geometry, cor);
-
-        cube.position.x = enderecos[end].posX * 0.6;
-        cube.position.y = (enderecos[end].posY + andar) * 0.6;
-        cube.position.z = posZ;
-        scene_.add(cube);
-    }
-    posZ -= 1;
-}
 
 window.addEventListener('DOMContentLoaded', () => {
     _APP = new FirstPersonCameraDemo();
