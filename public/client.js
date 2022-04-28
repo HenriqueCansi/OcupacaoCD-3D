@@ -16,6 +16,10 @@ const KEYS = {
     d: 68,
 };
 
+let posZ;
+let comprimentoCd = 0;
+let larguraCd = 0;
+
 function clamp(x, a, b) {
     return Math.min(Math.max(x, a), b);
 }
@@ -311,29 +315,42 @@ class FirstPersonCameraDemo {
 
         this.scene_ = new THREE.Scene();
 
-        const TextureBox = new THREE.TextureLoader().load(
-            './textures/box.jpg'
-        );
-        
-        var geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
-        var vermelho = new THREE.MeshMatcapMaterial({ color: 0xff0000, normalMap: TextureBox });
-        var amarelo = new THREE.MeshMatcapMaterial({ color: 0xffff00, normalMap: TextureBox  });
-        var verde = new THREE.MeshMatcapMaterial({ color: 0x00ff00, normalMap: TextureBox  });
+        const TextureBox = new THREE.TextureLoader().load('./textures/box.jpg');
+
+        var geometry = new THREE.BoxGeometry(0.9, 0.9, 0.9);
+        var vermelho = new THREE.MeshMatcapMaterial({
+            map: TextureBox,
+            color: 0xff0000,
+            //normalMap: TextureBox,
+        });
+        var amarelo = new THREE.MeshMatcapMaterial({
+            color: 0xffff00,
+            normalMap: TextureBox,
+        });
+        var verde = new THREE.MeshMatcapMaterial({
+            map: TextureBox,
+            color: 0x00ff00,
+        });
 
         const layout = layoutText;
         console.log('layout:', layout);
         console.log('layout.lenfsath:', layout.length);
 
-        let posZ = 0;
+        posZ = 0;
 
         for (let rua = 0; rua < layout.length; rua = rua + 1) {
-            console.log('rua', rua);
+            //console.log('rua', rua);
             let ultLado = 0;
 
             var dadorua = layout[rua];
             //console.log(dadorua);
 
             let andar = dadorua['rua'].max_andares;
+
+            if (dadorua['rua'].max_predios > larguraCd) {
+                larguraCd = dadorua['rua'].max_predios;
+            }
+            console.log(larguraCd);
 
             var enderecos = dadorua['rua'].enderecos; //.filter(({lado}) => lado === 1);
             //console.log(enderecos);
@@ -342,7 +359,8 @@ class FirstPersonCameraDemo {
                 //console.log(enderecos[end]);
                 if (ultLado != enderecos[end].lado) {
                     ultLado = enderecos[end].lado;
-                    posZ += 2;
+                    posZ += 4;
+                    comprimentoCd = posZ;
                 }
 
                 var cor = amarelo;
@@ -351,13 +369,23 @@ class FirstPersonCameraDemo {
 
                 var cube = new THREE.Mesh(geometry, cor);
 
-                cube.position.x = enderecos[end].posX * 0.6;
-                cube.position.y = (enderecos[end].posY + andar) * 0.6;
+                cube.position.x = enderecos[end].posX;
+                cube.position.y = enderecos[end].posY;
                 cube.position.z = posZ;
+                if (enderecos[end].size != 1) {
+                    cube.scale.x = enderecos[end].size;
+                    cube.scale.y = enderecos[end].size;
+                    cube.scale.z = enderecos[end].size;
+                }
+
                 this.scene_.add(cube);
             }
-            posZ -= 1;
+            posZ -= 2;
+            comprimentoCd = posZ;
         }
+
+        console.log(comprimentoCd);
+        //console.log(posZ);
 
         this.uiCamera_ = new THREE.OrthographicCamera(
             -1,
@@ -402,48 +430,58 @@ class FirstPersonCameraDemo {
             // });
         });
 
-        const plane = new THREE.Mesh(
-            new THREE.PlaneGeometry(100, 100, 10, 10),
-            concreteMaterial
+        const concreteTextureFloor = new THREE.TextureLoader().load(
+            './textures/ConcreteFloor.jpg'
         );
+        const concreteMaterialFloor = new THREE.MeshMatcapMaterial({
+            map: concreteTextureFloor,
+        });
+
+        const plane = new THREE.Mesh(
+            //largura, comprimento, ?, ?
+            new THREE.PlaneGeometry(larguraCd + 30, comprimentoCd + 20, 10, 10),
+            concreteMaterialFloor
+        );
+
         plane.castShadow = false;
-        plane.position.set(0, -0.5, 30);
-        plane.receiveShadow = true;
+        plane.position.set(larguraCd / 2, -0.5, comprimentoCd / 2);
+        //plane.receiveShadow = true;
         plane.rotation.x = -Math.PI / 2;
         this.scene_.add(plane);
 
         const wall1 = new THREE.Mesh(
-            new THREE.BoxGeometry(100, 100, 4),
+            new THREE.BoxGeometry(larguraCd + 30, 30, 1),
             concreteMaterial
         );
-        wall1.position.set(-5, -20, -5);
+        wall1.position.set(larguraCd / 2, 0, -10);
         wall1.castShadow = true;
         wall1.receiveShadow = true;
         this.scene_.add(wall1);
 
         const wall2 = new THREE.Mesh(
-            new THREE.BoxGeometry(100, 100, 4),
+            new THREE.BoxGeometry(larguraCd + 30, 30, 1),
             concreteMaterial
         );
-        wall2.position.set(0, -20, 75);
+        console.log(wall2);
+        wall2.position.set(larguraCd / 2, 0, comprimentoCd + 10);
         wall2.castShadow = true;
         wall2.receiveShadow = true;
         this.scene_.add(wall2);
 
         const wall3 = new THREE.Mesh(
-            new THREE.BoxGeometry(4, 100, 100),
+            new THREE.BoxGeometry(1, 30, comprimentoCd + 20),
             concreteMaterial
         );
-        wall3.position.set(40, -20, 30);
+        wall3.position.set(larguraCd + 15 , 0, comprimentoCd / 2);
         wall3.castShadow = true;
         wall3.receiveShadow = true;
         this.scene_.add(wall3);
 
         const wall4 = new THREE.Mesh(
-            new THREE.BoxGeometry(4, 100, 100),
+            new THREE.BoxGeometry(1, 30, comprimentoCd + 20),
             concreteMaterial
         );
-        wall4.position.set(-15, -20, 30);
+        wall4.position.set(-15, 0, comprimentoCd / 2);
         wall4.castShadow = true;
         wall4.receiveShadow = true;
         this.scene_.add(wall4);
