@@ -266,7 +266,7 @@ class FirstPersonCameraDemo {
 
     initialize_() {
         this.initializeRenderer_();
-        this.initializeLights_();
+       // this.initializeLights_();
         this.initializeScene_();
         this.initializePostFX_();
         this.initializeDemo_();
@@ -309,7 +309,7 @@ class FirstPersonCameraDemo {
         const fov = 60;
         const aspect = 1920 / 1080;
         const near = 1.0;
-        const far = 1000.0;
+        const far = 100.0;
         this.camera_ = new THREE.PerspectiveCamera(fov, aspect, near, far);
         this.camera_.position.set(0, 2, 0);
 
@@ -318,18 +318,25 @@ class FirstPersonCameraDemo {
         const TextureBox = new THREE.TextureLoader().load('./textures/box.jpg');
 
         var geometry = new THREE.BoxGeometry(0.9, 0.9, 0.9);
-        var vermelho = new THREE.MeshMatcapMaterial({
+        var vermelho = new THREE.MeshBasicMaterial({
             map: TextureBox,
             color: 0xff0000,
             //normalMap: TextureBox,
         });
-        var amarelo = new THREE.MeshMatcapMaterial({
+        var amarelo = new THREE.MeshBasicMaterial({
             color: 0xffff00,
-            normalMap: TextureBox,
+            map: TextureBox,
         });
-        var verde = new THREE.MeshMatcapMaterial({
+        var verde = new THREE.MeshBasicMaterial({
             map: TextureBox,
             color: 0x00ff00,
+        });
+
+        var azul = new THREE.MeshBasicMaterial({
+            //map: TextureBox,
+            wireframe: true,
+            opacity: 0.01,
+            transparent: true
         });
 
         const layout = layoutText;
@@ -366,16 +373,17 @@ class FirstPersonCameraDemo {
                 var cor = amarelo;
                 if (enderecos[end].cor === 'blq') cor = vermelho;
                 if (enderecos[end].cor === 'liv') cor = verde;
+                if (enderecos[end].cor === 'sub') cor = azul;
 
                 var cube = new THREE.Mesh(geometry, cor);
 
                 cube.position.x = enderecos[end].posX;
                 cube.position.y = enderecos[end].posY;
                 cube.position.z = posZ;
-                if (enderecos[end].size != 1) {
-                    cube.scale.x = enderecos[end].size;
-                    cube.scale.y = enderecos[end].size;
-                    cube.scale.z = enderecos[end].size;
+                if (enderecos[end].alt != 1 || enderecos[end].larg != 1) {
+                    cube.scale.x = enderecos[end].larg;
+                    cube.scale.y = enderecos[end].alt;
+                    //cube.scale.z = enderecos[end].size;
                 }
 
                 this.scene_.add(cube);
@@ -393,33 +401,21 @@ class FirstPersonCameraDemo {
             1 * aspect,
             -1 * aspect,
             1,
-            1000
+            2
         );
         this.uiScene_ = new THREE.Scene();
     }
 
     initializeScene_() {
-        const loader = new THREE.CubeTextureLoader();
-        const texture = loader.load([
-            './textures/skybox/posx.jpg',
-            './textures/skybox/negx.jpg',
-            './textures/skybox/posy.jpg',
-            './textures/skybox/negy.jpg',
-            './textures/skybox/posz.jpg',
-            './textures/skybox/negz.jpg',
-        ]);
-
-        texture.encoding = THREE.sRGBEncoding;
-        this.scene_.background = texture;
-
-        const mapLoader = new THREE.TextureLoader();
-        const maxAnisotropy = this.threejs_.capabilities.getMaxAnisotropy();
-        const checkerboard = mapLoader.load('resources/checkerboard.png');
-        checkerboard.anisotropy = maxAnisotropy;
-        checkerboard.wrapS = THREE.RepeatWrapping;
-        checkerboard.wrapT = THREE.RepeatWrapping;
-        checkerboard.repeat.set(32, 32);
-        checkerboard.encoding = THREE.sRGBEncoding;
+        
+        // const mapLoader = new THREE.TextureLoader();
+        // const maxAnisotropy = this.threejs_.capabilities.getMaxAnisotropy();
+        // const checkerboard = mapLoader.load('resources/checkerboard.png');
+        // checkerboard.anisotropy = maxAnisotropy;
+        // checkerboard.wrapS = THREE.RepeatWrapping;
+        // checkerboard.wrapT = THREE.RepeatWrapping;
+        // checkerboard.repeat.set(32, 32);
+        // checkerboard.encoding = THREE.sRGBEncoding;
 
         const concreteTexture = new THREE.TextureLoader().load(
             './textures/Concrete.jpg'
@@ -433,8 +429,8 @@ class FirstPersonCameraDemo {
         const concreteTextureFloor = new THREE.TextureLoader().load(
             './textures/ConcreteFloor.jpg'
         );
-        const concreteMaterialFloor = new THREE.MeshMatcapMaterial({
-            map: concreteTextureFloor,
+        const concreteMaterialFloor = new THREE.MeshBasicMaterial({
+            map: concreteTextureFloor,  side: THREE.DoubleSide
         });
 
         const plane = new THREE.Mesh(
@@ -449,8 +445,20 @@ class FirstPersonCameraDemo {
         plane.rotation.x = -Math.PI / 2;
         this.scene_.add(plane);
 
+        const plane2 = new THREE.Mesh(
+            //largura, comprimento, ?, ?
+            new THREE.PlaneGeometry(larguraCd + 30, comprimentoCd + 20, 50, 10),
+            concreteMaterialFloor
+        );
+
+        plane2.castShadow = false;
+        plane2.position.set(larguraCd / 2, 25 , comprimentoCd / 2, );
+        //plane.receiveShadow = true;
+        plane2.rotation.x = -Math.PI / 2;
+        this.scene_.add(plane2);
+
         const wall1 = new THREE.Mesh(
-            new THREE.BoxGeometry(larguraCd + 30, 30, 1),
+            new THREE.BoxGeometry(larguraCd + 30, 50, 1),
             concreteMaterial
         );
         wall1.position.set(larguraCd / 2, 0, -10);
@@ -459,7 +467,7 @@ class FirstPersonCameraDemo {
         this.scene_.add(wall1);
 
         const wall2 = new THREE.Mesh(
-            new THREE.BoxGeometry(larguraCd + 30, 30, 1),
+            new THREE.BoxGeometry(larguraCd + 30, 50, 1),
             concreteMaterial
         );
         console.log(wall2);
@@ -469,16 +477,16 @@ class FirstPersonCameraDemo {
         this.scene_.add(wall2);
 
         const wall3 = new THREE.Mesh(
-            new THREE.BoxGeometry(1, 30, comprimentoCd + 20),
+            new THREE.BoxGeometry(1, 50, comprimentoCd + 20),
             concreteMaterial
         );
-        wall3.position.set(larguraCd + 15 , 0, comprimentoCd / 2);
+        wall3.position.set(larguraCd + 15, 0, comprimentoCd / 2);
         wall3.castShadow = true;
         wall3.receiveShadow = true;
         this.scene_.add(wall3);
 
         const wall4 = new THREE.Mesh(
-            new THREE.BoxGeometry(1, 30, comprimentoCd + 20),
+            new THREE.BoxGeometry(1, 50, comprimentoCd + 20),
             concreteMaterial
         );
         wall4.position.set(-15, 0, comprimentoCd / 2);
@@ -486,9 +494,7 @@ class FirstPersonCameraDemo {
         wall4.receiveShadow = true;
         this.scene_.add(wall4);
 
-        // Create Box3 for each mesh in the scene so that we can
-        // do some easy intersection tests.
-        const meshes = [plane, wall1, wall2, wall3, wall4];
+        const meshes = [plane, plane2, wall1, wall2, wall3, wall4];
 
         this.objects_ = [];
 
@@ -499,12 +505,12 @@ class FirstPersonCameraDemo {
         }
 
         // Crosshair
-        const crosshair = mapLoader.load('./textures/teste.png');
-        crosshair.anisotropy = maxAnisotropy;
+        //const crosshair = mapLoader.load('./textures/teste.png');
+        //crosshair.anisotropy = maxAnisotropy;
 
         this.sprite_ = new THREE.Sprite(
             new THREE.SpriteMaterial({
-                map: crosshair,
+                //map: crosshair,
                 color: 0xffffff,
                 fog: false,
                 depthTest: false,
