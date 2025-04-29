@@ -4,7 +4,7 @@ import Stats from './jsm/libs/stats.module.js';
 import { GUI } from './jsm/libs/lil-gui.module.min.js';
 import { OBJLoader } from './jsm/loaders/OBJLoader.js';
 import { GLTFLoader } from './jsm/loaders/GLTFLoader.js';
-import layoutText from './layout.json' assert { type: 'json' };
+import { layoutText }  from './layout.js' //assert { type: 'json' };
 import { NearestFilter } from 'three';
 import { FirstPersonControls } from './jsm/controls/FirstPersonControls.js';
 
