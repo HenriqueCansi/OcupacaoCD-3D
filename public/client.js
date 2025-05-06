@@ -1,14 +1,6 @@
 import * as THREE from 'three';
-import { OrbitControls } from './jsm/controls/OrbitControls.js';
-import Stats from './jsm/libs/stats.module.js';
-import { GUI } from './jsm/libs/lil-gui.module.min.js';
-import { OBJLoader } from './jsm/loaders/OBJLoader.js';
-import { GLTFLoader } from './jsm/loaders/GLTFLoader.js';
-import { layoutText }  from './layout.js' //assert { type: 'json' };
-import { NearestFilter } from 'three';
-import { FirstPersonControls } from './jsm/controls/FirstPersonControls.js';
+import { layoutText } from './layout.js';
 
-let scene_;
 const KEYS = {
     a: 65,
     s: 83,
@@ -66,17 +58,22 @@ class InputController {
     }
 
     onMouseMove_(e) {
-        this.current_.mouseX = e.pageX - window.innerWidth / 2;
-        this.current_.mouseY = e.pageY - window.innerHeight / 2;
+        if (document.pointerLockElement === document.body) {
+            this.current_.mouseXDelta = e.movementX;
+            this.current_.mouseYDelta = e.movementY;
+        } else {
+            this.current_.mouseX = e.pageX - window.innerWidth / 2;
+            this.current_.mouseY = e.pageY - window.innerHeight / 2;
 
-        if (this.previous_ === null) {
-            this.previous_ = { ...this.current_ };
+            if (this.previous_ === null) {
+                this.previous_ = { ...this.current_ };
+            }
+
+            this.current_.mouseXDelta =
+                this.current_.mouseX - this.previous_.mouseX;
+            this.current_.mouseYDelta =
+                this.current_.mouseY - this.previous_.mouseY;
         }
-
-        this.current_.mouseXDelta =
-            this.current_.mouseX - this.previous_.mouseX;
-        this.current_.mouseYDelta =
-            this.current_.mouseY - this.previous_.mouseY;
     }
 
     onMouseDown_(e) {
@@ -138,32 +135,29 @@ class InputController {
 }
 
 class FirstPersonCamera {
-    constructor(camera, objects) {
+    constructor(camera, collisionBoxes) {
         this.camera_ = camera;
         this.input_ = new InputController();
         this.rotation_ = new THREE.Quaternion();
         this.translation_ = new THREE.Vector3(0, 2, 0);
         this.phi_ = 0;
-        this.phiSpeed_ = 8; //movimento da camera para os lados
+        this.phiSpeed_ = 8;
         this.theta_ = 0;
         this.thetaSpeed_ = 5;
         this.headBobActive_ = false;
-        // this.headBobTimer_ = 0;
-        this.objects_ = objects;
+        this.collisionBoxes_ = collisionBoxes;
     }
 
     update(timeElapsedS) {
         this.updateRotation_(timeElapsedS);
         this.updateCamera_(timeElapsedS);
         this.updateTranslation_(timeElapsedS);
-        //this.updateHeadBob_(timeElapsedS);
         this.input_.update(timeElapsedS);
     }
 
     updateCamera_(_) {
         this.camera_.quaternion.copy(this.rotation_);
         this.camera_.position.copy(this.translation_);
-        // this.camera_.position.y += Math.sin(this.headBobTimer_ * 10) * 1.5;
 
         const forward = new THREE.Vector3(0, 0, -1);
         forward.applyQuaternion(this.rotation_);
@@ -176,63 +170,40 @@ class FirstPersonCamera {
         let closest = forward;
         const result = new THREE.Vector3();
         const ray = new THREE.Ray(this.translation_, dir);
-        for (let i = 0; i < this.objects_.length; ++i) {
-            if (ray.intersectBox(this.objects_[i], result)) {
-                if (
-                    result.distanceTo(ray.origin) <
-                    closest.distanceTo(ray.origin)
-                ) {
-                    closest = result.clone();
-                }
-            }
-        }
-
+        // (Opcional: pode usar ray para highlight, etc)
         this.camera_.lookAt(closest);
     }
 
-    // updateHeadBob_(timeElapsedS) {
-    //     if (this.headBobActive_) {
-    //         const wavelength = Math.PI;
-    //         const nextStep =
-    //             1 +
-    //             Math.floor(((this.headBobTimer_ + 0.000001) * 10) / wavelength);
-    //         const nextStepTime = (nextStep * wavelength) / 10;
-    //         this.headBobTimer_ = Math.min(
-    //             this.headBobTimer_ + timeElapsedS,
-    //             nextStepTime
-    //         );
-
-    //         if (this.headBobTimer_ == nextStepTime) {
-    //             this.headBobActive_ = false;
-    //         }
-    //     }
-    // }
-
     updateTranslation_(timeElapsedS) {
         const forwardVelocity =
-            (this.input_.key(KEYS.w) ? 1 : 0) +
-            (this.input_.key(KEYS.s) ? -1 : 0);
+            (this.input_.key(KEYS.w) ? 1 : 0) + (this.input_.key(KEYS.s) ? -1 : 0);
         const strafeVelocity =
-            (this.input_.key(KEYS.a) ? 1 : 0) +
-            (this.input_.key(KEYS.d) ? -1 : 0);
+            (this.input_.key(KEYS.a) ? 1 : 0) + (this.input_.key(KEYS.d) ? -1 : 0);
 
-        const qx = new THREE.Quaternion();
-        qx.setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.phi_);
+        const qx = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.phi_);
 
-        const forward = new THREE.Vector3(0, 0, -1);
-        forward.applyQuaternion(qx);
-        forward.multiplyScalar(forwardVelocity * timeElapsedS * 10);
+        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(qx).multiplyScalar(forwardVelocity * timeElapsedS * 10);
+        const left = new THREE.Vector3(-1, 0, 0).applyQuaternion(qx).multiplyScalar(strafeVelocity * timeElapsedS * 10);
 
-        const left = new THREE.Vector3(-1, 0, 0);
-        left.applyQuaternion(qx);
-        left.multiplyScalar(strafeVelocity * timeElapsedS * 10);
+        const movement = forward.add(left);
+        if (movement.length() === 0) return;
 
-        this.translation_.add(forward);
-        this.translation_.add(left);
+        const nextPosition = this.translation_.clone().add(movement);
+        const cameraSphere = new THREE.Sphere(nextPosition, 0.4);
 
-        // if (forwardVelocity != 0 || strafeVelocity != 0) {
-        //     this.headBobActive_ = true;
-        //}
+        let colliding = false;
+
+        for (let i = 0; i < this.collisionBoxes_.length; ++i) {
+            const box = this.collisionBoxes_[i];
+            if (box.intersectsSphere(cameraSphere)) {
+                colliding = true;
+                break;
+            }
+        }
+
+        if (!colliding) {
+            this.translation_.add(movement);
+        }
     }
 
     updateRotation_(timeElapsedS) {
@@ -261,28 +232,22 @@ class FirstPersonCamera {
 
 class FirstPersonCameraDemo {
     constructor() {
+        this.collisionBoxes_ = [];
+        this.clickableMeshes_ = [];
         this.initialize_();
     }
 
     initialize_() {
         this.initializeRenderer_();
-       // this.initializeLights_();
         this.initializeScene_();
-        this.initializePostFX_();
         this.initializeDemo_();
-
         this.previousRAF_ = null;
         this.raf_();
         this.onWindowResize_();
     }
 
     initializeDemo_() {
-        // this.controls_ = new FirstPersonControls(
-        //     this.camera_, this.threejs_.domElement);
-        // this.controls_.lookSpeed = 0.8;
-        // this.controls_.movementSpeed = 5;
-
-        this.fpsCamera_ = new FirstPersonCamera(this.camera_, this.objects_);
+        this.fpsCamera_ = new FirstPersonCamera(this.camera_, this.collisionBoxes_);
     }
 
     initializeRenderer_() {
@@ -307,94 +272,15 @@ class FirstPersonCameraDemo {
         );
 
         const fov = 60;
-        const aspect = 1920 / 1080;
+        const aspect = window.innerWidth / window.innerHeight;
         const near = 1.0;
-        const far = 100.0;
+        const far = 200.0;
         this.camera_ = new THREE.PerspectiveCamera(fov, aspect, near, far);
         this.camera_.position.set(0, 2, 0);
 
         this.scene_ = new THREE.Scene();
 
-        const TextureBox = new THREE.TextureLoader().load('./textures/box.jpg');
-
-        var geometry = new THREE.BoxGeometry(0.9, 0.9, 0.9);
-        var vermelho = new THREE.MeshBasicMaterial({
-            map: TextureBox,
-            color: 0xff0000,
-            //normalMap: TextureBox,
-        });
-        var amarelo = new THREE.MeshBasicMaterial({
-            color: 0xffff00,
-            map: TextureBox,
-        });
-        var verde = new THREE.MeshBasicMaterial({
-            map: TextureBox,
-            color: 0x00ff00,
-        });
-
-        var azul = new THREE.MeshBasicMaterial({
-            //map: TextureBox,
-            wireframe: true,
-            opacity: 0.01,
-            transparent: true
-        });
-
-        const layout = layoutText;
-        console.log('layout:', layout);
-        console.log('layout.lenfsath:', layout.length);
-
-        posZ = 0;
-
-        for (let rua = 0; rua < layout.length; rua = rua + 1) {
-            //console.log('rua', rua);
-            let ultLado = 0;
-
-            var dadorua = layout[rua];
-            //console.log(dadorua);
-
-            let andar = dadorua['rua'].max_andares;
-
-            if (dadorua['rua'].max_predios > larguraCd) {
-                larguraCd = dadorua['rua'].max_predios;
-            }
-            console.log(larguraCd);
-
-            var enderecos = dadorua['rua'].enderecos; //.filter(({lado}) => lado === 1);
-            //console.log(enderecos);
-
-            for (let end = 0; end < enderecos.length; end = end + 1) {
-                //console.log(enderecos[end]);
-                if (ultLado != enderecos[end].lado) {
-                    ultLado = enderecos[end].lado;
-                    posZ += 4;
-                    comprimentoCd = posZ;
-                }
-
-                var cor = amarelo;
-                if (enderecos[end].cor === 'blq') cor = vermelho;
-                if (enderecos[end].cor === 'liv') cor = verde;
-                if (enderecos[end].cor === 'sub') cor = azul;
-
-                var cube = new THREE.Mesh(geometry, cor);
-
-                cube.position.x = enderecos[end].posX;
-                cube.position.y = enderecos[end].posY;
-                cube.position.z = posZ;
-                if (enderecos[end].alt != 1 || enderecos[end].larg != 1) {
-                    cube.scale.x = enderecos[end].larg;
-                    cube.scale.y = enderecos[end].alt;
-                    //cube.scale.z = enderecos[end].size;
-                }
-
-                this.scene_.add(cube);
-            }
-            posZ -= 2;
-            comprimentoCd = posZ;
-        }
-
-        console.log(comprimentoCd);
-        //console.log(posZ);
-
+        // Crosshair
         this.uiCamera_ = new THREE.OrthographicCamera(
             -1,
             1,
@@ -404,58 +290,93 @@ class FirstPersonCameraDemo {
             2
         );
         this.uiScene_ = new THREE.Scene();
+        this.sprite_ = new THREE.Sprite(
+            new THREE.SpriteMaterial({
+                color: 0xffffff,
+                fog: false,
+                depthTest: false,
+                depthWrite: false,
+            })
+        );
+        this.sprite_.scale.set(0.15, 0.15 * this.camera_.aspect, 1);
+        this.sprite_.position.set(0, 0, -10);
+        this.uiScene_.add(this.sprite_);
     }
 
     initializeScene_() {
-        
-        // const mapLoader = new THREE.TextureLoader();
-        // const maxAnisotropy = this.threejs_.capabilities.getMaxAnisotropy();
-        // const checkerboard = mapLoader.load('resources/checkerboard.png');
-        // checkerboard.anisotropy = maxAnisotropy;
-        // checkerboard.wrapS = THREE.RepeatWrapping;
-        // checkerboard.wrapT = THREE.RepeatWrapping;
-        // checkerboard.repeat.set(32, 32);
-        // checkerboard.encoding = THREE.sRGBEncoding;
+        // Materiais e texturas
+        const TextureBox = new THREE.TextureLoader().load('./textures/box.jpg');
+        const concreteTexture = new THREE.TextureLoader().load('./textures/Concrete.jpg');
+        const concreteMaterial = new THREE.MeshMatcapMaterial({ map: concreteTexture });
+        const concreteTextureFloor = new THREE.TextureLoader().load('./textures/ConcreteFloor.jpg');
+        const concreteMaterialFloor = new THREE.MeshBasicMaterial({ map: concreteTextureFloor, side: THREE.DoubleSide });
 
-        const concreteTexture = new THREE.TextureLoader().load(
-            './textures/Concrete.jpg'
-        );
-        const concreteMaterial = new THREE.MeshMatcapMaterial({
-            map: concreteTexture,
-            //     normalMap: texture,
-            // });
-        });
+        var geometry = new THREE.BoxGeometry(0.9, 0.9, 0.9);
+        var vermelho = new THREE.MeshBasicMaterial({ map: TextureBox, color: 0xff0000 });
+        var amarelo = new THREE.MeshBasicMaterial({ color: 0xffff00, map: TextureBox });
+        var verde = new THREE.MeshBasicMaterial({ map: TextureBox, color: 0x00ff00 });
+        var azul = new THREE.MeshBasicMaterial({ wireframe: true, opacity: 0.01, transparent: true });
 
-        const concreteTextureFloor = new THREE.TextureLoader().load(
-            './textures/ConcreteFloor.jpg'
-        );
-        const concreteMaterialFloor = new THREE.MeshBasicMaterial({
-            map: concreteTextureFloor,  side: THREE.DoubleSide
-        });
 
+        // Layout dos blocos
+        const layout = layoutText;
+        posZ = 0;
+        for (let rua = 0; rua < layout.length; rua = rua + 1) {
+            let ultLado = 0;
+            var dadorua = layout[rua];
+            let andar = dadorua['rua'].max_andares;
+            if (dadorua['rua'].max_predios > larguraCd) {
+                larguraCd = dadorua['rua'].max_predios;
+            }
+            var enderecos = dadorua['rua'].enderecos;
+            for (let end = 0; end < enderecos.length; end = end + 1) {
+                if (ultLado != enderecos[end].lado) {
+                    ultLado = enderecos[end].lado;
+                    posZ += 4;
+                    comprimentoCd = posZ;
+                }
+                var cor = amarelo;
+                if (enderecos[end].cor === 'blq') cor = vermelho;
+                if (enderecos[end].cor === 'liv') cor = verde;
+                if (enderecos[end].cor === 'sub') cor = azul;
+                var cube = new THREE.Mesh(geometry, cor);
+                cube.position.x = enderecos[end].posX;
+                cube.position.y = enderecos[end].posY;
+                cube.position.z = posZ;
+                if (enderecos[end].alt != 1 || enderecos[end].larg != 1) {
+                    cube.scale.x = enderecos[end].larg;
+                    cube.scale.y = enderecos[end].alt;
+                }
+                this.scene_.add(cube);
+                this.clickableMeshes_.push(cube);
+                this.collisionBoxes_.push(new THREE.Box3().setFromObject(cube));
+            }
+            posZ -= 2;
+            comprimentoCd = posZ;
+        }
+
+        // Chão e paredes
         const plane = new THREE.Mesh(
-            //largura, comprimento, ?, ?
             new THREE.PlaneGeometry(larguraCd + 30, comprimentoCd + 20, 10, 10),
             concreteMaterialFloor
         );
-
         plane.castShadow = false;
         plane.position.set(larguraCd / 2, -0.5, comprimentoCd / 2);
-        //plane.receiveShadow = true;
         plane.rotation.x = -Math.PI / 2;
         this.scene_.add(plane);
+        this.clickableMeshes_.push(plane);
+        this.collisionBoxes_.push(new THREE.Box3().setFromObject(plane));
 
         const plane2 = new THREE.Mesh(
-            //largura, comprimento, ?, ?
             new THREE.PlaneGeometry(larguraCd + 30, comprimentoCd + 20, 50, 10),
             concreteMaterialFloor
         );
-
         plane2.castShadow = false;
-        plane2.position.set(larguraCd / 2, 25 , comprimentoCd / 2, );
-        //plane.receiveShadow = true;
+        plane2.position.set(larguraCd / 2, 25, comprimentoCd / 2);
         plane2.rotation.x = -Math.PI / 2;
         this.scene_.add(plane2);
+        this.clickableMeshes_.push(plane2);
+        this.collisionBoxes_.push(new THREE.Box3().setFromObject(plane2));
 
         const wall1 = new THREE.Mesh(
             new THREE.BoxGeometry(larguraCd + 30, 50, 1),
@@ -465,16 +386,19 @@ class FirstPersonCameraDemo {
         wall1.castShadow = true;
         wall1.receiveShadow = true;
         this.scene_.add(wall1);
+        this.clickableMeshes_.push(wall1);
+        this.collisionBoxes_.push(new THREE.Box3().setFromObject(wall1));
 
         const wall2 = new THREE.Mesh(
             new THREE.BoxGeometry(larguraCd + 30, 50, 1),
             concreteMaterial
         );
-        console.log(wall2);
         wall2.position.set(larguraCd / 2, 0, comprimentoCd + 10);
         wall2.castShadow = true;
         wall2.receiveShadow = true;
         this.scene_.add(wall2);
+        this.clickableMeshes_.push(wall2);
+        this.collisionBoxes_.push(new THREE.Box3().setFromObject(wall2));
 
         const wall3 = new THREE.Mesh(
             new THREE.BoxGeometry(1, 50, comprimentoCd + 20),
@@ -484,6 +408,8 @@ class FirstPersonCameraDemo {
         wall3.castShadow = true;
         wall3.receiveShadow = true;
         this.scene_.add(wall3);
+        this.clickableMeshes_.push(wall3);
+        this.collisionBoxes_.push(new THREE.Box3().setFromObject(wall3));
 
         const wall4 = new THREE.Mesh(
             new THREE.BoxGeometry(1, 50, comprimentoCd + 20),
@@ -493,71 +419,9 @@ class FirstPersonCameraDemo {
         wall4.castShadow = true;
         wall4.receiveShadow = true;
         this.scene_.add(wall4);
-
-        const meshes = [plane, plane2, wall1, wall2, wall3, wall4];
-
-        this.objects_ = [];
-
-        for (let i = 0; i < meshes.length; ++i) {
-            const b = new THREE.Box3();
-            b.setFromObject(meshes[i]);
-            this.objects_.push(b);
-        }
-
-        // Crosshair
-        //const crosshair = mapLoader.load('./textures/teste.png');
-        //crosshair.anisotropy = maxAnisotropy;
-
-        this.sprite_ = new THREE.Sprite(
-            new THREE.SpriteMaterial({
-                //map: crosshair,
-                color: 0xffffff,
-                fog: false,
-                depthTest: false,
-                depthWrite: false,
-            })
-        );
-        this.sprite_.scale.set(0.15, 0.15 * this.camera_.aspect, 1);
-        this.sprite_.position.set(0, 0, -10);
-
-        this.uiScene_.add(this.sprite_);
+        this.clickableMeshes_.push(wall4);
+        this.collisionBoxes_.push(new THREE.Box3().setFromObject(wall4));
     }
-
-    initializeLights_() {
-        const distance = 50.0;
-        const angle = Math.PI / 4.0;
-        const penumbra = 0.5;
-        const decay = 1.0;
-
-        let light = new THREE.SpotLight(
-            0xffffff,
-            100.0,
-            distance,
-            angle,
-            penumbra,
-            decay
-        );
-        light.castShadow = true;
-        light.shadow.bias = -0.00001;
-        light.shadow.mapSize.width = 4096;
-        light.shadow.mapSize.height = 4096;
-        light.shadow.camera.near = 1;
-        light.shadow.camera.far = 100;
-
-        light.position.set(25, 25, 0);
-        light.lookAt(0, 0, 0);
-        this.scene_.add(light);
-
-        const upColour = 0xffff80;
-        const downColour = 0x808080;
-        light = new THREE.HemisphereLight(upColour, downColour, 0.5);
-        light.color.setHSL(0.6, 1, 0.6);
-        light.groundColor.setHSL(0.095, 1, 0.75);
-        light.position.set(0, 4, 0);
-        this.scene_.add(light);
-    }
-
-    initializePostFX_() {}
 
     onWindowResize_() {
         this.camera_.aspect = window.innerWidth / window.innerHeight;
@@ -588,13 +452,54 @@ class FirstPersonCameraDemo {
 
     step_(timeElapsed) {
         const timeElapsedS = timeElapsed * 0.001;
-
-        // this.controls_.update(timeElapsedS);
         this.fpsCamera_.update(timeElapsedS);
     }
 }
+
 let _APP = null;
 
 window.addEventListener('DOMContentLoaded', () => {
     _APP = new FirstPersonCameraDemo();
+});
+
+document.body.addEventListener('click', () => {
+    document.body.requestPointerLock();
+});
+
+document.addEventListener('pointerlockchange', () => {
+    if (document.pointerLockElement === document.body) {
+        console.log('Pointer locked');
+    } else {
+        console.log('Pointer unlocked');
+    }
+});
+
+// Raycaster para clique
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2(0, 0);
+
+document.addEventListener('mousedown', (event) => {
+    if (document.pointerLockElement !== document.body) return;
+    if (!_APP) return;
+    raycaster.setFromCamera(mouse, _APP.camera_);
+    const intersects = raycaster.intersectObjects(_APP.clickableMeshes_, false);
+    if (intersects.length > 0) {
+        const obj = intersects[0].object;
+        // Garante que cada bloco tem seu próprio material
+        if (obj.material && obj.material.isMaterial && !obj.material._isCloned) {
+            obj.material = obj.material.clone();
+            obj.material._isCloned = true; // marca para não clonar de novo
+        }
+        if (obj.material && obj.material.color) {
+            const hex = obj.material.color.getHex();
+            if (hex === 0xffff00) { // amarelo
+                obj.material.color.set(0xff0000); // vira vermelho
+            } else if (hex === 0xff0000) { // vermelho
+                obj.material.color.set(0x00ff00); // vira verde
+            } else if (hex === 0x00ff00) { // verde
+                obj.material.color.set(0xffff00); // vira amarelo
+            }
+        }
+        console.log('Cor do bloco alterada!');
+    }
 });
